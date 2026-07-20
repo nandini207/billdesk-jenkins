@@ -17,7 +17,7 @@ pipeline {
         stage('Checkout Source Code') {
             steps {
                 git branch: 'main',
-                    url: 'https://github.com/nandini207/billdesk-jenkins'
+                    url: 'https://github.com/nandini207/billdesk-jenkins.git'
             }
         }
 
@@ -34,17 +34,27 @@ pipeline {
         }
 
         stage('Stop Existing Application') {
-            steps {
-                bat '''
-                @echo off
-                for /f "tokens=5" %%a in ('netstat -ano ^| findstr :8089') do (
-                    echo Stopping existing application...
-                    taskkill /PID %%a /F
-                )
-                exit /b 0
-                '''
-            }
-        }
+    steps {
+        bat '''
+        @echo off
+
+        set PID=
+
+        for /f "tokens=5" %%a in ('netstat -ano ^| findstr :9090') do (
+            set PID=%%a
+        )
+
+        if defined PID (
+            echo Stopping application running on port 9090...
+            taskkill /F /PID %PID%
+        ) else (
+            echo No application is running on port 9090.
+        )
+
+        exit /b 0
+        '''
+    }
+}
 
         stage('Deploy Application') {
             steps {
@@ -52,11 +62,12 @@ pipeline {
                 @echo off
                 echo Starting Spring Boot Application...
 
-                start "SpringBootApp" cmd /c java -jar target\\*.jar
+                powershell -Command "Start-Process java -ArgumentList '-jar','target\\products-crud-0.0.1-SNAPSHOT.jar' -WindowStyle Hidden"
 
                 timeout /t 10 > nul
 
                 echo Application Started Successfully.
+                exit /b 0
                 '''
             }
         }
