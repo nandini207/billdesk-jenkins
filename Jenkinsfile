@@ -1,9 +1,8 @@
 pipeline {
-
     agent any
 
     tools {
-        jdk 'Jdk-21'
+        jdk 'Jdk-25'
         maven 'Maven-3.9'
     }
 
@@ -13,11 +12,9 @@ pipeline {
     }
 
     stages {
-
         stage('Checkout Source Code') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/nandini207/billdesk-jenkins.git'
+                git branch: 'main', url: 'https://github.com/nandini207/billdesk-jenkins.git'
             }
         }
 
@@ -34,57 +31,45 @@ pipeline {
         }
 
         stage('Stop Existing Application') {
+            steps {
+                bat '''
+                @echo off
+                for /f "tokens=5" %%a in ('netstat -ano ^| findstr :8089') do (
+                    echo Stopping existing application PID %%a...
+                    taskkill /PID %%a /F
+                )
+                exit /b 0
+                '''
+            }
+        }
+
+        stage('Deploy Application') {
     steps {
         bat '''
         @echo off
+        echo Starting Spring Boot Application...
 
-        set PID=
+        :: Prevent Jenkins from terminating the application
+        set JENKINS_NODE_COOKIE=dontKillMe
 
-        for /f "tokens=5" %%a in ('netstat -ano ^| findstr :9090') do (
-            set PID=%%a
-        )
+        :: Start the Spring Boot application in the background
+        start "" javaw -jar target\\crud-0.0.1-SNAPSHOT.jar > app.log 2>&1
 
-        if defined PID (
-            echo Stopping application running on port 9090...
-            taskkill /F /PID %PID%
-        ) else (
-            echo No application is running on port 9090.
-        )
+        :: Wait for application startup
+        ping 127.0.0.1 -n 11 > nul
 
-        exit /b 0
+        echo Application Started Successfully.
         '''
     }
 }
-
-	stage('Deploy Application') {
-	    steps {
-	        bat '''
-	        @echo off
-	        echo Starting Spring Boot Application...
-	
-	        :: Prevent Jenkins from terminating the application
-	        set JENKINS_NODE_COOKIE=dontKillMe
-	
-	        :: Start the Spring Boot application in the background
-	        start "" javaw -jar target\\LearningGIT-0.0.1-SNAPSHOT.jar > app.log 2>&1
-	
-	        :: Wait for application startup
-	        ping 127.0.0.1 -n 11 > nul
-	
-	        echo Application Started Successfully.
-	        '''
-	    }
     }
 
     post {
-
         success {
             echo 'Pipeline executed successfully.'
         }
-
         failure {
             echo 'Pipeline failed.'
         }
-
     }
- }
+}
